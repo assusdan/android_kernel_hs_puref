@@ -1261,10 +1261,10 @@ static int tpd_touchinfo(struct touch_info *cinfo)
         for (i = 0; i < point_num; i++) 
 		{		
 				elan_ktf2k_ts_parse_xy(&buf[ 2 + 3*i ], &x, &y);
-				x = x * 540 / X_RESOLUTION;
-				y = y * 960 / Y_RESOLUTION;
-                if (x >= 540) x = 539;
-                if (y >= 960) y = 959;
+				x = x * 480 / X_RESOLUTION;
+				y = y * 800 / Y_RESOLUTION;
+                if (x >= 480) x = 479;
+                if (y >= 800) y = 799;
 
 				cinfo->x[ i ] = x;
 				cinfo->y[ i ] = y;
