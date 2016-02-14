@@ -74,7 +74,7 @@ uint8_t *fw_data_p;
 
 /*The newest firmware, if update must be changed here*/
 static uint8_t file_fw_data[] = {
-#include "hua_14fa_4110.i"
+//#include "hua_14fa_4110.i"
 };
 
 #endif
@@ -172,9 +172,9 @@ static void tpd_eint_interrupt_handler(void);
 static inline int elan_ktf2k_ts_parse_xy(uint8_t *data,
 			uint16_t *x, uint16_t *y);
 
-static int __devinit tpd_probe(struct i2c_client *client, const struct i2c_device_id *id);
+static int tpd_probe(struct i2c_client *client, const struct i2c_device_id *id);
 static int tpd_detect(struct i2c_client *client, int kind, struct i2c_board_info *info);
-static int __devexit tpd_remove(struct i2c_client *client);
+static int tpd_remove(struct i2c_client *client);
 static int touch_event_handler(void *unused);
 
 #if defined(TP_REPLACE_ALSPS)
@@ -293,7 +293,7 @@ static struct i2c_driver tpd_i2c_driver =
         .owner = THIS_MODULE,
     },
     .probe = tpd_probe,
-    .remove = __devexit_p(tpd_remove),
+    .remove = tpd_remove,
     .id_table = tpd_id,
     .detect = tpd_detect,
     //.address_data = &addr_data,
@@ -1820,15 +1820,14 @@ static int __hello_packet_handler(struct i2c_client *client)
 extern int get_rtc_spare_tpfwid_value(void);
 extern int set_rtc_spare_tpfwid_value(int val);
 int GetAndSet_TPFW_ID_info(int fw_id)
-{
-    TPFW_ID = get_rtc_spare_tpfwid_value();
-    pr_tp(TPD_DEVICE "[elan] get_rtc_spare_fg_value:[0x%x],FW_ID=0x%x\n",TPFW_ID,FW_ID);
-    if(0!=FW_ID)
-    {
-        TPFW_ID = FW_ID;
-        set_rtc_spare_tpfwid_value(FW_ID);
-        pr_tp(TPD_DEVICE "[elan] get_rtc_spare_fg_value:[0x%x]\n",get_rtc_spare_tpfwid_value());
-    }
+{ //commented by assusdan
+    //TPFW_ID = get_rtc_spare_tpfwid_value();
+    //pr_tp(TPD_DEVICE "[elan] get_rtc_spare_fg_value:[0x%x],FW_ID=0x%x\n",TPFW_ID,FW_ID);
+   // if(0!=FW_ID)
+   // {
+    //    TPFW_ID = FW_ID;
+    //    set_rtc_spare_tpfwid_value(FW_ID);
+    ////}
     return 1;
 }
 //add by sen.luo for chipinfo 2013.09.24 start
@@ -1995,7 +1994,7 @@ static int elan_ktf2k_ts_setup(struct i2c_client *client)
 
 struct platform_driver ektf2k_tp_driver;
 
-static int __devinit tpd_probe(struct i2c_client *client, const struct i2c_device_id *id)
+static int tpd_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
     int retval = TPD_OK;
     int fw_err;
@@ -2168,7 +2167,7 @@ elan_ktf2k_touch_sysfs_init();
     return 0;
 }
 
-static int __devexit tpd_remove(struct i2c_client *client)
+static int tpd_remove(struct i2c_client *client)
 
 {
    int err;	
