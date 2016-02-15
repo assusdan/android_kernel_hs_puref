@@ -8,8 +8,8 @@ ifeq ($(CONFIG_MTK_TMD2772_AUTO),y)
 obj-y	+=  alsps/tmd2772_auto/
 endif
 
-ifeq ($(CONFIG_MTK_KXCJK_1013_AUTO),y)
-obj-y   +=  accelerometer/kxcjk_1013_auto/
+ifeq ($(CONFIG_MTK_KXTJ2_1009),y)
+obj-y   +=  accelerometer/KXTJ2_1009/
 endif
 
 ifeq ($(CONFIG_MTK_LIS3DH_AUTO),y)
@@ -26,6 +26,10 @@ endif
 
 ifeq ($(CONFIG_MTK_ST480_AUTO),y)
 obj-y	+=  magnetometer/st480_auto/
+endif
+
+ifeq ($(CONFIG_MTK_EPL2182),y)
+obj-y	+=  alsps/epl2182/
 endif
 
 ifeq ($(CONFIG_MTK_MMC3516X_AUTO),y)
