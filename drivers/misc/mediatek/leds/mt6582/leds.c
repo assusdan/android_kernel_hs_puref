@@ -34,9 +34,8 @@
 //#include <linux/leds_sw.h>
 //#include <mach/mt_pmic_feature_api.h>
 //#include <mach/mt_boot.h>
-#ifdef CUSTOM_KERNEL_GYROSCOPE_BULMA
-#include "aw2013.h"
-#endif
+
+
 static DEFINE_MUTEX(leds_mutex);
 static DEFINE_MUTEX(leds_pmic_mutex);
 //#define ISINK_CHOP_CLK
@@ -67,6 +66,9 @@ static int debug_enable_led_hal = 1;
 	}\
 }while(0)
 
+#ifdef MTK_HDMI_SUPPORT
+extern BOOL hdmi_is_active;
+#endif
 /****************************************************************************
  * custom APIs
 ***************************************************************************/
@@ -91,10 +93,7 @@ extern unsigned int Cust_GetBacklightLevelSupport_byPWM(void);
 /****************************************************************************
  * func:return global variables
  ***************************************************************************/
-#ifdef BLK_LEVEL_LIMIT_CUST //for a special Backlight Driver IC
-#define MIN_VALUE_DUTY    8
-#define MAX_VALUE_DUTY   245
-#endif
+
 void mt_leds_wake_lock_init(void)
 {
 	wake_lock_init(&leds_suspend_lock, WAKE_LOCK_SUSPEND, "leds wakelock");
@@ -269,12 +268,18 @@ static int led_breath_pmic(enum mt65xx_led_pmic pmic_type, struct nled_setting* 
 
 #endif
 
+#ifdef RESPIRATION_LAMP
+static unsigned char leds_lev_STEP = 32;
+static unsigned char leds_DUTY_STEP = 8;
+static unsigned char leds_current[]={0,1,2,3,4,5,6,7};
+#endif
 
-#define PMIC_PERIOD_NUM 8 //ckt modify
+
+#define PMIC_PERIOD_NUM 9
 // 100 * period, ex: 0.01 Hz -> 0.01 * 100 = 1
-int pmic_period_array[PMIC_PERIOD_NUM] = {250,500,1000,1250,1666,2000,2500,10000};
+int pmic_period_array[] = {250,500,1000,1250,1666,2000,2500,10000};
 //int pmic_freqsel_array[] = {99999, 9999, 4999, 1999, 999, 499, 199, 4, 0};
-int pmic_freqsel_array[PMIC_PERIOD_NUM] = {0, 4, 199, 499, 999, 1999, 1999, 1999};
+int pmic_freqsel_array[] = {0, 4, 199, 499, 999, 1999, 1999, 1999};
 
 static int find_time_index_pmic(int time_ms) {
 	int i;
@@ -297,65 +302,115 @@ int mt_led_blink_pmic(enum mt65xx_led_pmic pmic_type, struct nled_setting* led) 
 		pmic_type!= MT65XX_LED_PMIC_NLED_ISINK2 && pmic_type!= MT65XX_LED_PMIC_NLED_ISINK3) || led->nled_mode != NLED_BLINK) {
 		return -1;
 	}
+	#ifdef RESPIRATION_LAMP
+	// just adjust duty only, and fixed frequency selection, xiangfei.peng add 20140516
+	time_index = 5; // use 1999 fixed only
+	if(led->blink_off_time > 0)
+	{
+		duty = 4 * (led->blink_on_time + led->blink_off_time)/led->blink_off_time;
+	}
+	if(duty > 32)
+	{
+		duty = 32;
+	}
+	#else
 				
 	LEDS_DEBUG("[LED]LED blink on time = %d offtime = %d\n",led->blink_on_time,led->blink_off_time);
 	time_index = find_time_index_pmic(led->blink_on_time + led->blink_off_time);
 	LEDS_DEBUG("[LED]LED index is %d  freqsel=%d\n", time_index, pmic_freqsel_array[time_index]);
 	duty=32*led->blink_on_time/(led->blink_on_time + led->blink_off_time);
+	#endif
+	#ifdef RESPIRATION_LAMP
+	printk("[LHJLED][%s]level=%d,duty=%d\n",__func__,led->level,duty);
+	#endif
 	//upmu_set_rg_drv_2m_ck_pdn(0x0); // Disable power down (Indicator no need)
+	mutex_lock(&leds_pmic_mutex); // xiangfei.peng add 20140516
     upmu_set_rg_drv_32k_ck_pdn(0x0); // Disable power down  
 	switch(pmic_type){
 		case MT65XX_LED_PMIC_NLED_ISINK0:
 			upmu_set_rg_isink0_ck_pdn(0);
 			upmu_set_rg_isink0_ck_sel(0);
+			#ifdef RESPIRATION_LAMP
+			upmu_set_isink_ch0_mode(PMIC_PWM_0);
+			upmu_set_isink_ch0_step(2);//(leds_current[led->level/leds_lev_STEP]);//12mA
+			upmu_set_isink_dim0_duty(duty); //(led->level*9/leds_DUTY_STEP/10);
+			upmu_set_isink_dim0_fsel(pmic_freqsel_array[time_index]);
+			#else
 			upmu_set_isink_ch0_mode(PMIC_PWM_0);
 			upmu_set_isink_ch0_step(0x0);//4mA
 			upmu_set_isink_dim0_duty(duty);
 			upmu_set_isink_dim0_fsel(pmic_freqsel_array[time_index]);
+			// just Breath Mode use below three sels
 			upmu_set_isink_breath0_trf_sel(0x0);
 			upmu_set_isink_breath0_ton_sel(0x02);
 			upmu_set_isink_breath0_toff_sel(0x05);			
+			#endif
 			upmu_set_isink_ch0_en(0x01);
 			break;
 		case MT65XX_LED_PMIC_NLED_ISINK1:
 			upmu_set_rg_isink1_ck_pdn(0);
 			upmu_set_rg_isink1_ck_sel(0);
+			#ifdef RESPIRATION_LAMP
+			upmu_set_isink_ch1_mode(PMIC_PWM_0);
+			upmu_set_isink_ch1_step(2);//(leds_current[led->level/leds_lev_STEP]);//12mA
+			upmu_set_isink_dim1_duty(duty); //(led->level*9/leds_DUTY_STEP/10);
+			upmu_set_isink_dim1_fsel(pmic_freqsel_array[time_index]);
+			#else
 			upmu_set_isink_ch1_mode(PMIC_PWM_0);
 			upmu_set_isink_ch1_step(0x0);//4mA
 			upmu_set_isink_dim1_duty(duty);
 			upmu_set_isink_dim1_fsel(pmic_freqsel_array[time_index]);
+			// just Breath Mode use below three sels
 			upmu_set_isink_breath1_trf_sel(0x0);
 			upmu_set_isink_breath1_ton_sel(0x02);
 			upmu_set_isink_breath1_toff_sel(0x05);			
+			#endif
 			upmu_set_isink_ch1_en(0x01);
 			break;	
 		case MT65XX_LED_PMIC_NLED_ISINK2:
 			upmu_set_rg_isink2_ck_pdn(0);
 			upmu_set_rg_isink2_ck_sel(0);
+			#ifdef RESPIRATION_LAMP
+			upmu_set_isink_ch2_mode(PMIC_PWM_0);
+			upmu_set_isink_ch2_step(2);//(leds_current[led->level/leds_lev_STEP]);//12mA
+			upmu_set_isink_dim2_duty(duty); //(led->level*9/leds_DUTY_STEP/10);
+			upmu_set_isink_dim2_fsel(pmic_freqsel_array[time_index]);
+			#else
 			upmu_set_isink_ch2_mode(PMIC_PWM_0);
 			upmu_set_isink_ch2_step(0x0);//4mA
 			upmu_set_isink_dim2_duty(duty);
 			upmu_set_isink_dim2_fsel(pmic_freqsel_array[time_index]);
+			// just Breath Mode use below three sels
 			upmu_set_isink_breath2_trf_sel(0x0);
 			upmu_set_isink_breath2_ton_sel(0x02);
 			upmu_set_isink_breath2_toff_sel(0x05);
+			#endif
 			upmu_set_isink_ch2_en(0x01);
 			break;	
 		case MT65XX_LED_PMIC_NLED_ISINK3:
 			upmu_set_rg_isink3_ck_pdn(0);
 			upmu_set_rg_isink3_ck_sel(0);
+			#ifdef RESPIRATION_LAMP
+			upmu_set_isink_ch3_mode(PMIC_PWM_0);
+			upmu_set_isink_ch3_step(2);//(leds_current[led->level/leds_lev_STEP]);//12mA
+			upmu_set_isink_dim3_duty(duty); //(led->level*9/leds_DUTY_STEP/10);
+			upmu_set_isink_dim3_fsel(pmic_freqsel_array[time_index]);
+			#else
 			upmu_set_isink_ch3_mode(PMIC_PWM_2);
 			upmu_set_isink_ch3_step(0x3);//4mA
 			upmu_set_isink_dim3_duty(duty);
 			upmu_set_isink_dim3_fsel(pmic_freqsel_array[time_index]);
+			// just Breath Mode use below three sels
 			upmu_set_isink_breath3_trf_sel(0x0);
 			upmu_set_isink_breath3_ton_sel(0x02);
 			upmu_set_isink_breath3_toff_sel(0x05);
+			#endif
 			upmu_set_isink_ch3_en(0x01);
 			break;	
 		default:
 		break;
 	}
+	mutex_unlock(&leds_pmic_mutex); // xiangfei.peng add 20140516
 	return 0;
 }
 
@@ -389,7 +444,7 @@ int mt_backlight_set_pwm(int pwm_num, u32 level, u32 div, struct PWM_config *con
 		}
 		else
 		{
-			pwm_setting.clk_src = PWM_CLK_OLD_MODE_32K;	 // actually. it's block/1625 = 26M/1625 = 16KHz 
+			pwm_setting.clk_src = PWM_CLK_OLD_MODE_32K;	 // actually. it's block/1625 = 26M/1625 = 16KHz @ MT6571
 		}
 
 		pwm_setting.PWM_MODE_OLD_REGS.IDLE_VALUE = 0;
@@ -425,7 +480,7 @@ int mt_backlight_set_pwm(int pwm_num, u32 level, u32 div, struct PWM_config *con
 		pwm_setting.clk_src = PWM_CLK_NEW_MODE_BLOCK_DIV_BY_1625;
 		}
 	
-	if(config_data->High_duration && config_data->low_duration)
+		if(config_data->High_duration && config_data->low_duration)
 		{
 			pwm_setting.PWM_MODE_FIFO_REGS.HDURATION = config_data->High_duration;
 			pwm_setting.PWM_MODE_FIFO_REGS.LDURATION = pwm_setting.PWM_MODE_FIFO_REGS.HDURATION;
@@ -691,13 +746,21 @@ int mt_brightness_set_pmic(enum mt65xx_led_pmic pmic_type, u32 level, u32 div)
 					upmu_set_isink_ch3_en(0);
 				first_time = false;
 			}
+
 				upmu_set_rg_drv_32k_ck_pdn(0x0); // Disable power down  
 				upmu_set_rg_isink0_ck_pdn(0);
 				upmu_set_rg_isink0_ck_sel(0);
+				#ifdef RESPIRATION_LAMP
+				upmu_set_isink_ch0_mode(PMIC_PWM_0);
+				upmu_set_isink_ch0_step(2);// 12mA //(leds_current[level/leds_lev_STEP]);//16mA
+				//hwPWMsetting(PMIC_PWM_1, 15, 8);
+				upmu_set_isink_dim0_duty(level/leds_DUTY_STEP);
+				#else
 				upmu_set_isink_ch0_mode(PMIC_PWM_2);
-				upmu_set_isink_ch0_step(0x0);//4mA 0x3 16mA
+				upmu_set_isink_ch0_step(0x0);//16mA
 				//hwPWMsetting(PMIC_PWM_1, 15, 8);
 				upmu_set_isink_dim0_duty(15);
+				#endif
 				upmu_set_isink_dim0_fsel(0);//6323 1KHz
 				
 			
@@ -716,6 +779,7 @@ int mt_brightness_set_pmic(enum mt65xx_led_pmic pmic_type, u32 level, u32 div)
 		}
 		else if(pmic_type == MT65XX_LED_PMIC_NLED_ISINK1)
 		{
+
 			if((button_flag_isink1==0) && (first_time == true)) {//button flag ==0, means this ISINK is not for button backlight
 				if(button_flag_isink0==0)
 					upmu_set_isink_ch0_en(0); 
@@ -725,13 +789,21 @@ int mt_brightness_set_pmic(enum mt65xx_led_pmic pmic_type, u32 level, u32 div)
 					upmu_set_isink_ch3_en(0);
 				first_time = false;
 			}
+
 				upmu_set_rg_drv_32k_ck_pdn(0x0); // Disable power down  
 				upmu_set_rg_isink1_ck_pdn(0);
 				upmu_set_rg_isink1_ck_sel(0);
+				#ifdef RESPIRATION_LAMP
+				upmu_set_isink_ch1_mode(PMIC_PWM_0);
+				upmu_set_isink_ch1_step(2);// 12mA //(leds_current[level/leds_lev_STEP]);//16mA
+				//hwPWMsetting(PMIC_PWM_2, 15, 8);
+				upmu_set_isink_dim1_duty(level/leds_DUTY_STEP);
+				#else
 				upmu_set_isink_ch1_mode(PMIC_PWM_2);
-				upmu_set_isink_ch1_step(0x0);//4mA 0x3 16mA
+				upmu_set_isink_ch1_step(0x0);//16mA
 				//hwPWMsetting(PMIC_PWM_2, 15, 8);
 				upmu_set_isink_dim1_duty(15);
+				#endif
 				upmu_set_isink_dim1_fsel(0);//6323 1KHz
 
 			if (level) 
@@ -768,10 +840,17 @@ int mt_brightness_set_pmic(enum mt65xx_led_pmic pmic_type, u32 level, u32 div)
 				upmu_set_rg_drv_32k_ck_pdn(0x0); // Disable power down  
 				upmu_set_rg_isink2_ck_pdn(0);
 				upmu_set_rg_isink2_ck_sel(0);
+				#ifdef RESPIRATION_LAMP
+				upmu_set_isink_ch2_mode(PMIC_PWM_0);
+				upmu_set_isink_ch2_step(2);// 12mA //(leds_current[level/leds_lev_STEP]);//16mA
+				//hwPWMsetting(PMIC_PWM_2, 15, 8);
+				upmu_set_isink_dim2_duty(level/leds_DUTY_STEP);
+				#else
 				upmu_set_isink_ch2_mode(PMIC_PWM_2);
-				upmu_set_isink_ch2_step(0x0);//4mA 0x3 16mA
+				upmu_set_isink_ch2_step(0x0);//16mA
 				//hwPWMsetting(PMIC_PWM_2, 15, 8);
 				upmu_set_isink_dim2_duty(15);
+				#endif
 				upmu_set_isink_dim2_fsel(0);//6323 1KHz
 
 
@@ -797,13 +876,21 @@ int mt_brightness_set_pmic(enum mt65xx_led_pmic pmic_type, u32 level, u32 div)
 					upmu_set_isink_ch2_en(0);
 				first_time = false;
 			}
+
 				upmu_set_rg_drv_32k_ck_pdn(0x0); // Disable power down  
 				upmu_set_rg_isink3_ck_pdn(0);
 				upmu_set_rg_isink3_ck_sel(0);
+				#ifdef RESPIRATION_LAMP
+				upmu_set_isink_ch3_mode(PMIC_PWM_0);
+				upmu_set_isink_ch3_step(2);// 12mA //(leds_current[level/leds_lev_STEP]);//16mA
+				//hwPWMsetting(PMIC_PWM_2, 15, 8);
+				upmu_set_isink_dim3_duty(level/leds_DUTY_STEP);
+				#else
 				upmu_set_isink_ch3_mode(PMIC_PWM_2);
 				upmu_set_isink_ch3_step(0x3);//16mA
 				//hwPWMsetting(PMIC_PWM_1, 15, 8);
 				upmu_set_isink_dim3_duty(15);
+				#endif
 				upmu_set_isink_dim3_fsel(0);//6323 1KHz
 
 			
@@ -887,11 +974,15 @@ int mt_mt65xx_led_set_cust(struct cust_mt65xx_led *cust, int level)
 			level = LED_FULL;
 		else if (level < 0)
 			level = 0;
-	*/
-	unsigned int led;//wangli_20140722
-	
+	*/	
     LEDS_DEBUG("mt65xx_leds_set_cust: set brightness, name:%s, mode:%d, level:%d\n", 
 		cust->name, cust->mode, level);
+#ifdef MTK_HDMI_SUPPORT
+    if(hdmi_is_active) {
+        printk("mt_mt65xx_led_set_cust hdmi active, return!\n");
+        return 0;
+    }
+#endif		
 	switch (cust->mode) {
 		
 		case MT65XX_LED_MODE_PWM:
@@ -907,9 +998,9 @@ int mt_mt65xx_led_set_cust(struct cust_mt65xx_led *cust, int level)
 				}else
 				{
 					if (BacklightLevelSupport == BACKLIGHT_LEVEL_PWM_256_SUPPORT)
-					level = brightness_mapping(tmp_level);
+						level = brightness_mapping(tmp_level);
 					else
-						level = brightness_mapto64(tmp_level);
+						level = brightness_mapto64(tmp_level);	
 					mt_backlight_set_pwm(cust->data, level, bl_div_hal,&cust->config_data);
 				}
                 bl_duty_hal = level;	
@@ -978,27 +1069,7 @@ int mt_mt65xx_led_set_cust(struct cust_mt65xx_led *cust, int level)
 			return ((cust_set_brightness)(cust->data))(level);
 			//LEDS_DEBUG("brightness_set_cust:backlight control by BLS_PWM done!!\n");
 			//#endif
-        //add aw2013 for NLED test 
-#ifdef CUSTOM_KERNEL_GYROSCOPE_BULMA
-        case MT65XX_LED_MODE_CUST:
-            if(strcmp(cust->name,"red") == 0) {
-                led = 0;
-            }
-            else if(strcmp(cust->name,"green") == 0) {
-                led = 1;
-            }
-            else {
-                led = 2;
-            }
-            LEDS_DEBUG("==== mt_mt65xx_led_set_cust:led=%d ====\n",led);
-            if(level == 0) {
-                Suspend_led();
-            }
-            else {
-                led_flash_aw2013(led);
-            }
-            return 0;
-#endif            
+            
 		case MT65XX_LED_MODE_NONE:
 		default:
 			break;
@@ -1011,7 +1082,7 @@ void mt_mt65xx_led_work(struct work_struct *work)
 	struct mt65xx_led_data *led_data =
 		container_of(work, struct mt65xx_led_data, work);
 
-	LEDS_DEBUG("[LED]%s:%d\n", led_data->cust.name, led_data->level);
+	LEDS_DEBUG("[LED][%s]%s:%d\n", __func__,led_data->cust.name, led_data->level);
 	mutex_lock(&leds_mutex);
 	mt_mt65xx_led_set_cust(&led_data->cust, led_data->level);
 	mutex_unlock(&leds_mutex);;
@@ -1023,7 +1094,6 @@ void mt_mt65xx_led_set(struct led_classdev *led_cdev, enum led_brightness level)
 		container_of(led_cdev, struct mt65xx_led_data, cdev);
 	//unsigned long flags;
 	//spin_lock_irqsave(&leds_lock, flags);
-	
 #ifdef LED_INCREASE_LED_LEVEL_MTKPATCH
 	
 		if(level >> LED_RESERVEBIT_SHIFT)
@@ -1050,7 +1120,7 @@ void mt_mt65xx_led_set(struct led_classdev *led_cdev, enum led_brightness level)
 				level = (1 << MT_LED_INTERNAL_LEVEL_BIT_CNT) - 1;
 			}
 	
-			led_cdev->brightness = ((level + (1 << (MT_LED_INTERNAL_LEVEL_BIT_CNT - 9))) >> (MT_LED_INTERNAL_LEVEL_BIT_CNT - 8));//brightness is 8 bit level
+			led_cdev->brightness = (level >> (MT_LED_INTERNAL_LEVEL_BIT_CNT - 8));//brightness is 8 bit level
 			if(led_cdev->brightness > led_cdev->max_brightness)
 			{
 				led_cdev->brightness = led_cdev->max_brightness;
@@ -1077,21 +1147,6 @@ void mt_mt65xx_led_set(struct led_classdev *led_cdev, enum led_brightness level)
 					LEDS_DEBUG("[LED]Set Backlight directly %d at time %lu\n",led_data->level,jiffies);
 					if(MT65XX_LED_MODE_CUST_BLS_PWM == led_data->cust.mode)
 					{
-						#ifdef BLK_LEVEL_LIMIT_CUST //for a special Backlight Driver IC
-                         if((0< level ) && (MIN_VALUE_DUTY >= level) )
-                         {
-                            //(MIN_VALUE_DUTY*1023+127/255)/1023 = 3.3%  > (500ns*50.8KHz)
-                            level = MIN_VALUE_DUTY;
-                         }
-                         else if(MAX_VALUE_DUTY <= level)
-                         {
-                            level = MAX_VALUE_DUTY;
-                         }
-                         else
-                         {
-                          	LEDS_DEBUG("[LED]Backlight Range is 9-244\n");
-                         }
-						#endif
 						mt_mt65xx_led_set_cust(&led_data->cust, ((((1 << MT_LED_INTERNAL_LEVEL_BIT_CNT) - 1)*level + 127)/255));
 						//mt_mt65xx_led_set_cust(&led_data->cust, led_data->level);	
 					}
@@ -1127,13 +1182,18 @@ int  mt_mt65xx_blink_set(struct led_classdev *led_cdev,
 		container_of(led_cdev, struct mt65xx_led_data, cdev);
 	static int got_wake_lock = 0;
 	struct nled_setting nled_tmp_setting = {0,0,0};
-
+	
 	// only allow software blink when delay_on or delay_off changed
 	if (*delay_on != led_data->delay_on || *delay_off != led_data->delay_off) {
 		led_data->delay_on = *delay_on;
 		led_data->delay_off = *delay_off;
+		
 		if (led_data->delay_on && led_data->delay_off) { // enable blink
-			led_data->level = 255; // when enable blink  then to set the level  (255)
+			#ifdef RESPIRATION_LAMP
+			led_data->level = led_data->cdev.trig_brightness; 
+			#else
+			led_data->level = 200;//255; // when enable blink  then to set the level  (255), duty̫���ᵼ�²���˸
+			#endif
 			//if(led_data->cust.mode == MT65XX_LED_MODE_PWM && 
 			//(led_data->cust.data != PWM3 && led_data->cust.data != PWM4 && led_data->cust.data != PWM5))
 
@@ -1155,6 +1215,9 @@ int  mt_mt65xx_blink_set(struct led_classdev *led_cdev,
 					nled_tmp_setting.nled_mode = NLED_BLINK;
 					nled_tmp_setting.blink_off_time = led_data->delay_off;
 					nled_tmp_setting.blink_on_time = led_data->delay_on;
+					#ifdef RESPIRATION_LAMP
+					nled_tmp_setting.level = led_data->level;
+					#endif
 					mt_led_blink_pmic(led_data->cust.data, &nled_tmp_setting);
 					return 0;
 				} else {
@@ -1202,108 +1265,3 @@ int  mt_mt65xx_blink_set(struct led_classdev *led_cdev,
 	return 0;
 }
 
-#ifdef RESPIRATION_LAMP
-int mt_led_blink_pmic_cust(struct nled_setting* led) {
-	int time_index = 0;
-	int duty = 0;
-	int rgb[3] = {0,0,0}; // red,green,blue
-	int i = 0;
-	struct cust_mt65xx_led *p_cust_led_list = get_cust_led_list();
-	
-	if(led->nled_mode != NLED_BLINK) {
-		return -1;
-	}
-
-	mutex_lock(&leds_pmic_mutex);
-	duty = 12;
-	if(led->blink_on_time && led->blink_off_time)
-	{
-		time_index = find_time_index_pmic(led->blink_on_time + led->blink_off_time);
-	}
-	else
-	{
-		time_index = 0; // keep bright or black
-	}
-	LEDS_DEBUG("[LED]%s:level=%08x,freq=%d,on = %u,off = %u\n",__func__,led->level,pmic_freqsel_array[time_index],led->blink_on_time,led->blink_off_time);
-	rgb[0] = (led->level & 0x00FF0000) >> 16;
-	rgb[1] = (led->level & 0x0000FF00) >> 8;
-	rgb[2] = led->level & 0x000000FF;
-	
-	//upmu_set_rg_drv_2m_ck_pdn(0x0); // Disable power down (Indicator no need)
-	upmu_set_rg_drv_32k_ck_pdn(0x0); // Disable power down
-	for(i = 0; i < 3 ;  i++ )
-	{
-		// from red to blue
-		printk("[phil] curr %s LED,level %d\n",p_cust_led_list[i].name,rgb[i]);
-		if(rgb[i] != 0)
-		{
-			switch(p_cust_led_list[i].data)
-			{
-				case MT65XX_LED_PMIC_NLED_ISINK0:
-					upmu_set_rg_isink0_ck_pdn(0);
-					upmu_set_rg_isink0_ck_sel(0);
-					upmu_set_isink_ch0_mode(PMIC_PWM_0);
-					upmu_set_isink_ch0_step(2);//(leds_current[led->level/leds_lev_STEP]);//12mA
-					upmu_set_isink_dim0_duty(duty); //(led->level*9/leds_DUTY_STEP/10);
-					upmu_set_isink_dim0_fsel(pmic_freqsel_array[time_index]);
-					//upmu_set_isink_ch0_en(1);
-					break;
-				case MT65XX_LED_PMIC_NLED_ISINK1:
-					upmu_set_rg_isink1_ck_pdn(0);
-					upmu_set_rg_isink1_ck_sel(0);
-					upmu_set_isink_ch1_mode(PMIC_PWM_0);
-					upmu_set_isink_ch1_step(2);//(leds_current[led->level/leds_lev_STEP]);//12mA
-					upmu_set_isink_dim1_duty(duty); //(led->level*9/leds_DUTY_STEP/10);
-					upmu_set_isink_dim1_fsel(pmic_freqsel_array[time_index]);
-					//upmu_set_isink_ch1_en(1);
-					break;
-				case MT65XX_LED_PMIC_NLED_ISINK2:
-					upmu_set_rg_isink2_ck_pdn(0);
-					upmu_set_rg_isink2_ck_sel(0);
-					upmu_set_isink_ch2_mode(PMIC_PWM_0);
-					upmu_set_isink_ch2_step(2);//(leds_current[led->level/leds_lev_STEP]);//12mA
-					upmu_set_isink_dim2_duty(duty); //(led->level*9/leds_DUTY_STEP/10);
-					upmu_set_isink_dim2_fsel(pmic_freqsel_array[time_index]);
-					//upmu_set_isink_ch2_en(1);
-					break;
-				case MT65XX_LED_PMIC_NLED_ISINK3:
-					upmu_set_rg_isink3_ck_pdn(0);
-					upmu_set_rg_isink3_ck_sel(0);
-					upmu_set_isink_ch3_mode(PMIC_PWM_0);
-					upmu_set_isink_ch3_step(2);//(leds_current[led->level/leds_lev_STEP]);//12mA
-					upmu_set_isink_dim3_duty(duty); //(led->level*9/leds_DUTY_STEP/10);
-					upmu_set_isink_dim3_fsel(pmic_freqsel_array[time_index]);
-					//upmu_set_isink_ch3_en(1);
-					break;
-				default:
-					break;
-			}
-		}
-	}
-	for(i = 0; i < 3 ;  i++ )
-	{
-		// from red to blue
-		int tmp_enable = (rgb[i] == 0)? 0 : 1;
-		switch(p_cust_led_list[i].data)
-		{
-			case MT65XX_LED_PMIC_NLED_ISINK0:
-				upmu_set_isink_ch0_en(tmp_enable);
-				break;
-			case MT65XX_LED_PMIC_NLED_ISINK1:
-				upmu_set_isink_ch1_en(tmp_enable);
-				break;
-			case MT65XX_LED_PMIC_NLED_ISINK2:
-				upmu_set_isink_ch2_en(tmp_enable);
-				break;
-			case MT65XX_LED_PMIC_NLED_ISINK3:
-				upmu_set_isink_ch3_en(tmp_enable);
-				break;
-			default:
-				break;
-		}
-	}
-	mutex_unlock(&leds_pmic_mutex);
-	return 0;
-}
-
-#endif
