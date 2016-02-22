@@ -6,7 +6,7 @@
 #echo 'Start building...'
 
 # Set options
-export ARCH=arm CROSS_COMPILE=../android_toolchain/linaro-4.9/bin/arm-linux-androideabi-
+export ARCH=arm CROSS_COMPILE=../android_toolchain_hf/bin/arm-cortex_a7-linux-gnueabihf-
 export KBUILD_BUILD_USER=assusdan
 export KBUILD_BUILD_HOST=SRT
 
