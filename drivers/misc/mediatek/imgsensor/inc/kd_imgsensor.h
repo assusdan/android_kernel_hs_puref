@@ -259,7 +259,7 @@
 #define GC2235_SENSOR_ID        0x2235
 #define OV8865_SENSOR_ID			  0x8865
 #define GC2355_SENSOR_ID			0x2355
-#define HI551_SENSOR_ID			    0x0551
+#define HI551MIPI_SENSOR_ID			    0x0551
 
 #define HI841_SENSOR_ID			    0x0841
 #define GC0310_SENSOR_ID			0xa310

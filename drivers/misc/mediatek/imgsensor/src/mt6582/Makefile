@@ -8,7 +8,7 @@ obj-y				+= kd_sensorlist.o
 ifeq ($(wildcard $(srctree)/arch/arm/mach-$(MTK_PLATFORM)/$(ARCH_MTK_PROJECT)/imgsensor),)
 
 custom_kernel_imgsensor := $(addsuffix /, $(shell echo $(CONFIG_CUSTOM_KERNEL_IMGSENSOR)))
-
+obj-y += hi551_mipi_raw/
 obj-y += $(custom_kernel_imgsensor)
 
 endif

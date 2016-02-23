@@ -28,7 +28,10 @@
 static DEFINE_SPINLOCK(kdsensor_drv_lock);
 
 #define SUPPORT_I2C_BUS_NUM1        1
-
+#ifndef SUPPORT_I2C_BUS_NUM2
+    #define SUPPORT_I2C_BUS_NUM2        2
+#endif
+static u32 gI2CBusNum=SUPPORT_I2C_BUS_NUM1;
 
 #define CAMERA_HW_DRVNAME1  "kd_camera_hw"
 
@@ -227,6 +230,7 @@ static atomic_t g_CamHWOpend;
 static atomic_t g_CamHWOpening;
 static atomic_t g_CamDrvOpenCnt;
 
+static struct i2c_client * g_pstI2Cclient2= NULL;
 
 
 static DEFINE_MUTEX(kdCam_Mutex);
@@ -439,6 +443,33 @@ int iWriteReg(u16 a_u2Addr , u32 a_u4Data , u32 a_u4Bytes , u16 i2cId)
 }
 
 
+int kdSetI2CBusNum(u32 i2cBusNum){
+
+    if((i2cBusNum != SUPPORT_I2C_BUS_NUM2) && (i2cBusNum != SUPPORT_I2C_BUS_NUM1)){
+        PK_DBG("[kdSetI2CBusNum] i2c bus number is not correct(%d) \n",i2cBusNum);
+        return -1;
+    }
+    spin_lock(&kdsensor_drv_lock);
+    gI2CBusNum = i2cBusNum;
+    spin_unlock(&kdsensor_drv_lock);
+
+    return 0;
+}
+
+void kdSetI2CSpeed(u32 i2cSpeed)
+{
+     if(gI2CBusNum == SUPPORT_I2C_BUS_NUM1) {
+        spin_lock(&kdsensor_drv_lock);
+        g_pstI2Cclient->timing = i2cSpeed;
+        spin_unlock(&kdsensor_drv_lock);
+     }
+     else{
+        spin_lock(&kdsensor_drv_lock);
+        g_pstI2Cclient2->timing = i2cSpeed;
+        spin_unlock(&kdsensor_drv_lock);
+     }
+
+}
 
 /*******************************************************************************
 * iBurstWriteReg
