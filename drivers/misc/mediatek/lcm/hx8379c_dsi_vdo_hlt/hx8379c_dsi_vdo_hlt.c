@@ -46,7 +46,8 @@ static struct LCM_setting_table lcm_initialization_setting[] = {
     		0x14						  }},
     {0xD5,0x20,{0x18,0x18,0x02,0x03,0x00,0x01,0x06,0x07,0x04,0x05,
         	0x18,0x18,0x20,0x21,0x18,0x18,0x1A,0x1A,0x18,0x18,
-    		0x1B,0x1B,0x18,0x18,0x18,0x18,0x18,0x18,0x18,0x18 }},
+    		0x1B,0x1B,0x18,0x18,0x18,0x18,0x18,0x18,0x18,0x18,
+    		0x18,0x18					  }},
     {0xE0,0x2A,{0x00,0x00,0x07,0x0D,0x0F,0x3F,0x25,0x32,0x09,0x0F,
         	0x11,0x1A,0x11,0x15,0x18,0x16,0x16,0x09,0x13,0x14,
         	0x19,0x00,0x00,0x06,0x0E,0x0E,0x3F,0x25,0x32,0x0A,
@@ -59,29 +60,6 @@ static struct LCM_setting_table lcm_initialization_setting[] = {
     {REGFLAG_DELAY, 100, {					  }},
     {REGFLAG_END_OF_TABLE, 0x00, {				  }}
 };
-
-//---------------------------------
-
-static struct LCM_setting_table lcm_set_window[] = {
-    {0x2A, 4, {0x00, 0x00, (FRAME_WIDTH>>8), (FRAME_WIDTH&0xFF)}},
-    {0x2B, 4, {0x00, 0x00, (FRAME_HEIGHT>>8), (FRAME_HEIGHT&0xFF)}},
-    {REGFLAG_END_OF_TABLE, 0x00, {}}
-};
-
-static struct LCM_setting_table lcm_sleep_out_setting[] = {
-    {0x11, 0, {0x00}},
-    {REGFLAG_DELAY, 120, {}},
-    {0x29, 0, {0x00}},
-    {REGFLAG_DELAY, 10, {}},
-    {REGFLAG_END_OF_TABLE, 0x00, {}}
-};
-
-static struct LCM_setting_table lcm_sleep_in_setting[] = {
-    {0x28, 0, {0x00}},
-    {0x10, 0, {0x00}},
-    {REGFLAG_END_OF_TABLE, 0x00, {}}
-};
-
 //---------------------------------
 
 static void push_table(struct LCM_setting_table *table, unsigned int count, unsigned char force_update) {
@@ -100,50 +78,51 @@ static void push_table(struct LCM_setting_table *table, unsigned int count, unsi
         }
     }
 }
-// ---------------------------------------------------------------------------
-// LCM Driver Implementations
-// ---------------------------------------------------------------------------
+
 static void lcm_set_util_funcs(const LCM_UTIL_FUNCS *util)
 {
     memcpy(&lcm_util, util, sizeof(LCM_UTIL_FUNCS));
 }
 
+// ---------------------------------------------------------------------------
+// LCM Driver Implementations
+// ---------------------------------------------------------------------------
 static void lcm_get_params(LCM_PARAMS *params)
 {
 	//code from LK
     memset(params, 0, sizeof(LCM_PARAMS));
-    params->type  = LCM_TYPE_DSI;
-    params->width = FRAME_WIDTH;
-    params->height = FRAME_HEIGHT;
-    params->dbi.te_mode = LCM_DBI_TE_MODE_DISABLED;
-    params->dbi.te_edge_polarity = LCM_POLARITY_RISING;
-    params->dsi.mode  = SYNC_PULSE_VDO_MODE;
-    params->dsi.LANE_NUM = LCM_TWO_LANE;
+    params->type  			= LCM_TYPE_DSI;
+    params->width 			= FRAME_WIDTH;
+    params->height 			= FRAME_HEIGHT;
+    params->dbi.te_mode 		= LCM_DBI_TE_MODE_DISABLED;
+    params->dbi.te_edge_polarity 	= LCM_POLARITY_RISING;
+    params->dsi.mode  			= SYNC_PULSE_VDO_MODE;
+    params->dsi.LANE_NUM 		= LCM_TWO_LANE;
     params->dsi.data_format.color_order = LCM_COLOR_ORDER_RGB;
-    params->dsi.data_format.trans_seq  = LCM_DSI_TRANS_SEQ_MSB_FIRST;
-    params->dsi.data_format.padding = LCM_DSI_PADDING_ON_LSB;
-    params->dsi.data_format.format  = LCM_DSI_FORMAT_RGB888;
-    params->dsi.packet_size=256;
-    params->dsi.intermediat_buffer_num = 2;
-    params->dsi.PS=LCM_PACKED_PS_24BIT_RGB888;
-    params->dsi.word_count  =480*3;
-    params->dsi.vertical_sync_active = 3;
-    params->dsi.vertical_backporch = 7;
-    params->dsi.vertical_frontporch = 6;
-    params->dsi.vertical_active_line = FRAME_HEIGHT;
-    params->dsi.horizontal_sync_active = 36;
-    params->dsi.horizontal_backporch = 36;
-    params->dsi.horizontal_frontporch = 36;
+    params->dsi.data_format.trans_seq  	= LCM_DSI_TRANS_SEQ_MSB_FIRST;
+    params->dsi.data_format.padding 	= LCM_DSI_PADDING_ON_LSB;
+    params->dsi.data_format.format  	= LCM_DSI_FORMAT_RGB888;
+    params->dsi.packet_size		= 256;
+    params->dsi.intermediat_buffer_num 	= 2;
+    params->dsi.PS			= LCM_PACKED_PS_24BIT_RGB888;
+    params->dsi.word_count  		= 480*3;
+    params->dsi.vertical_sync_active 	= 3;
+    params->dsi.vertical_backporch 	= 7;
+    params->dsi.vertical_frontporch 	= 6;
+    params->dsi.vertical_active_line 	= FRAME_HEIGHT;
+    params->dsi.horizontal_sync_active 	= 36;
+    params->dsi.horizontal_backporch 	= 36;
+    params->dsi.horizontal_frontporch 	= 36;
     params->dsi.horizontal_active_pixel = FRAME_WIDTH;
-    params->dsi.pll_div1=1;
-    params->dsi.pll_div2=1;
-    params->dsi.fbk_div =30;
-    params->dsi.ssc_disable=1;
-    params->dsi.lcm_int_te_monitor=FALSE;
-    params->dsi.lcm_int_te_period=1;
-    params->dsi.lcm_ext_te_monitor=FALSE;
-    params->dsi.noncont_clock=TRUE;
-    params->dsi.noncont_clock_period=2;
+    params->dsi.pll_div1		= 1;
+    params->dsi.pll_div2		= 1;
+    params->dsi.fbk_div 		= 30;
+    params->dsi.ssc_disable		= 1;
+    params->dsi.lcm_int_te_monitor	= FALSE;
+    params->dsi.lcm_int_te_period	= 1;
+    params->dsi.lcm_ext_te_monitor	= FALSE;
+    params->dsi.noncont_clock		= TRUE;
+    params->dsi.noncont_clock_period	= 2;
 }
 static void lcm_init(void)
 {
@@ -198,22 +177,7 @@ static void lcm_update( unsigned int x, unsigned int y,
 }
 static unsigned int lcm_compare_id(void)
 {
-    unsigned int id=0;
-    unsigned char buffer[4];
-    unsigned int array[16];
-    hwPowerOn(MT6323_POWER_LDO_VGP2, VOL_2800, "Lance_LCM");
-    hwPowerOn(MT6323_POWER_LDO_VGP3, VOL_1800, "Lance_LCM");
-    SET_RESET_PIN(1);
-    SET_RESET_PIN(0);
-    MDELAY(1);
-    SET_RESET_PIN(1);
-    MDELAY(10);//Must over 6 ms
-    array[0] = 0x00033700;// return byte number
-    dsi_set_cmdq(&array, 1, 1);
-    MDELAY(10);
-    read_reg_v2(0x04, buffer, 3);
-    id = buffer[1];
-    return 1;
+	return 1;
 }
 // ---------------------------------------------------------------------------
 // Get LCM Driver Hooks
