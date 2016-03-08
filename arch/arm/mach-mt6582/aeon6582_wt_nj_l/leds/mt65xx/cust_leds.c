@@ -27,11 +27,7 @@ unsigned int Cust_GetBacklightLevelSupport_byPWM(void)
 
 unsigned int brightness_mapping(unsigned int level)
 {
-    unsigned int mapped_level;
-    
-    mapped_level = level;
-       
-	return mapped_level;
+   return level;
 }
 /*
 unsigned int Cust_SetBacklight(int level, int div)
