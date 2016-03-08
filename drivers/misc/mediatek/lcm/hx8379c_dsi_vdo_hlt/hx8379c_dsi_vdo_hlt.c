@@ -6,7 +6,7 @@
 #define FRAME_WIDTH 		(480)
 #define FRAME_HEIGHT 		(800)
 #define REGFLAG_DELAY 		0XFE
-#define REGFLAG_END_OF_TABLE  	0xFF  // END OF REGISTERS MARKER
+#define REGFLAG_END_OF_TABLE  	0xFFF  // END OF REGISTERS MARKER
 #define LCM_ID 			0x79
 static unsigned int lcm_compare_id(void);
 // ---------------------------------------------------------------------------
@@ -54,10 +54,14 @@ static struct LCM_setting_table lcm_initialization_setting[] = {
     		0x10,0x11,0x1A,0x10,0x14,0x17,0x14,0x15,0x06,0x11,
     		0x11,0x16					  }},
     {0xB6,0x02,{0x85,0x85					  }},
-    {0x11,0x01,{0x00						  }}, // Sleep-Out
-    {REGFLAG_DELAY, 150, 					   },
-    {0x29,0x01,{0x00						  }},
-    {REGFLAG_DELAY, 100, {					  }},
+    {0x11,0x00,						  	   }, // Sleep-Out
+    {REGFLAG_DELAY, 120, 					   },
+    {0x29,0x00						  	   },
+    {REGFLAG_DELAY, 10, {					  }},
+    {0x28,0x01,{0x00						  }}, // Sleep-Out0
+    {REGFLAG_DELAY, 150, {					  }},
+    {0x10,0x01,{0x00						  }}, // Sleep-Out0
+    {REGFLAG_DELAY, 100, 					   },
     {REGFLAG_END_OF_TABLE, 0x00, {				  }}
 };
 //---------------------------------
